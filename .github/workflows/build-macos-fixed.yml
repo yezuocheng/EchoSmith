@@ -79,7 +79,7 @@ jobs:
       - name: Build frontend
         working-directory: frontend
         run: |
-          npm ci
+          npm install --package-lock=false
           npm run build
 
       - name: Copy frontend logo
