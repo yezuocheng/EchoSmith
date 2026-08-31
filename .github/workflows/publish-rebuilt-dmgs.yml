@@ -40,9 +40,9 @@ jobs:
         run: |
           set -euo pipefail
           tag="rebuilt-v1.4.3"
-          if ! gh release view "$tag" >/dev/null 2>&1; then
-            gh release create "$tag" --target "$GITHUB_SHA" --prerelease \
+          if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
               --title "EchoSmith v1.4.3 rebuilt native macOS DMGs" \
               --notes "Native arm64 and x64 builds. Ad-hoc signed; not Apple-notarized."
           fi
-          gh release upload "$tag" --clobber artifacts/*/*.dmg
+          gh release upload "$tag" --repo "$GITHUB_REPOSITORY" --clobber artifacts/*/*.dmg
