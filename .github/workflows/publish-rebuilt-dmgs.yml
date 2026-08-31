@@ -1,0 +1,48 @@
+name: Publish rebuilt macOS DMGs
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful native macOS build run ID
+        required: true
+        default: "33372959602"
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download verified DMG artifacts
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.run_id }}
+          pattern: echosmith-macos-*
+          path: artifacts
+
+      - name: Check expected DMGs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f artifacts/echosmith-macos-arm64/EchoSmith_1.4.3_arm64.dmg
+          test -f artifacts/echosmith-macos-x64/EchoSmith_1.4.3_x64.dmg
+          sha256sum artifacts/*/*.dmg
+
+      - name: Publish prerelease assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="rebuilt-v1.4.3"
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            gh release create "$tag" --target "$GITHUB_SHA" --prerelease \
+              --title "EchoSmith v1.4.3 rebuilt native macOS DMGs" \
+              --notes "Native arm64 and x64 builds. Ad-hoc signed; not Apple-notarized."
+          fi
+          gh release upload "$tag" --clobber artifacts/*/*.dmg
