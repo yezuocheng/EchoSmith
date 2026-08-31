@@ -1,0 +1,165 @@
+name: Build fixed macOS DMGs
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-macos:
+    name: macOS ${{ matrix.package_arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            package_arch: arm64
+            machine_arch: arm64
+            rust_target: aarch64-apple-darwin
+          - runner: macos-15-intel
+            package_arch: x64
+            machine_arch: x86_64
+            rust_target: x86_64-apple-darwin
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Confirm native runner architecture
+        run: |
+          set -euo pipefail
+          actual_arch=$(uname -m)
+          echo "Runner architecture: $actual_arch"
+          test "$actual_arch" = "${{ matrix.machine_arch }}"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            tauri/package-lock.json
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tauri/src-tauri
+          key: ${{ matrix.rust_target }}
+
+      - name: Install native dependencies
+        run: brew install ffmpeg
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install pyinstaller
+
+      - name: Download ASR models
+        run: python scripts/download_models.py
+
+      - name: Build native backend
+        run: bash scripts/build_backend.sh
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Copy frontend logo
+        run: cp echo_logo.svg frontend/dist/
+
+      - name: Install Tauri dependencies
+        working-directory: tauri
+        run: npm ci
+
+      - name: Prepare backend resources
+        run: |
+          rm -rf tauri/src-tauri/backend
+          cp -R tauri_backend_dist/backend tauri/src-tauri/backend
+          test -x tauri/src-tauri/backend/backend
+
+      - name: Build native app bundle
+        working-directory: tauri
+        env:
+          APPLE_SIGNING_IDENTITY: "-"
+        run: npm run build -- --target "${{ matrix.rust_target }}" --bundles app
+
+      - name: Re-sign and verify app bundle
+        run: |
+          set -euo pipefail
+          app_path="tauri/src-tauri/target/${{ matrix.rust_target }}/release/bundle/macos/EchoSmith.app"
+          test -d "$app_path"
+
+          while IFS= read -r -d '' item; do
+            if file -b "$item" | grep -q "Mach-O"; then
+              codesign --force --sign - --timestamp=none "$item"
+            fi
+          done < <(find "$app_path/Contents" -type f -print0)
+
+          codesign --force --deep --sign - --timestamp=none "$app_path"
+          codesign --verify --deep --strict --verbose=4 "$app_path"
+          python scripts/verify_macos_bundle.py \
+            --app "$app_path" \
+            --expected-arch "${{ matrix.machine_arch }}"
+
+      - name: Create and verify DMG
+        run: |
+          set -euo pipefail
+          app_path="tauri/src-tauri/target/${{ matrix.rust_target }}/release/bundle/macos/EchoSmith.app"
+          output_dir="tauri/src-tauri/target/${{ matrix.rust_target }}/release/bundle/dmg"
+          version=$(python -c 'import json; print(json.load(open("tauri/src-tauri/tauri.conf.json", encoding="utf-8"))["version"])')
+          dmg_path="$output_dir/EchoSmith_${version}_${{ matrix.package_arch }}.dmg"
+          staging_dir=$(mktemp -d)
+          mount_dir=$(mktemp -d)
+
+          cleanup() {
+            hdiutil detach "$mount_dir" >/dev/null 2>&1 || true
+            rm -rf "$staging_dir" "$mount_dir"
+          }
+          trap cleanup EXIT
+
+          mkdir -p "$output_dir"
+          cp -R "$app_path" "$staging_dir/EchoSmith.app"
+          ln -s /Applications "$staging_dir/Applications"
+          hdiutil create \
+            -volname "EchoSmith" \
+            -srcfolder "$staging_dir" \
+            -ov \
+            -format UDZO \
+            "$dmg_path"
+          hdiutil verify "$dmg_path"
+
+          hdiutil attach -readonly -nobrowse -mountpoint "$mount_dir" "$dmg_path"
+          codesign --verify --deep --strict --verbose=4 "$mount_dir/EchoSmith.app"
+          python scripts/verify_macos_bundle.py \
+            --app "$mount_dir/EchoSmith.app" \
+            --expected-arch "${{ matrix.machine_arch }}"
+          hdiutil detach "$mount_dir"
+
+          shasum -a 256 "$dmg_path"
+          ls -lh "$dmg_path"
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: echosmith-macos-${{ matrix.package_arch }}
+          path: tauri/src-tauri/target/${{ matrix.rust_target }}/release/bundle/dmg/*.dmg
+          if-no-files-found: error
+          retention-days: 7
