@@ -7,6 +7,7 @@ import os
 import platform
 import re
 import subprocess
+import threading
 import wave
 from dataclasses import dataclass
 from pathlib import Path
@@ -151,6 +152,7 @@ class ASREngine:
         self._recognizer: sherpa_onnx.OfflineRecognizer | None = None
         self._vad_config: sherpa_onnx.VadModelConfig | None = None
         self._model_lock = asyncio.Lock()
+        self._transcription_lock = threading.Lock()
         self._model_dir = model_dir
         self._download_callback = download_callback
         self._model_downloading = False

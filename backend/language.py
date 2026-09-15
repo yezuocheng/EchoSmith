@@ -9,18 +9,20 @@ from weakref import WeakKeyDictionary
 
 DEFAULT_LANGUAGE = "en"
 SUPPORTED_LANGUAGES = frozenset({"auto", "en", "zh"})
-_TRANSCRIPTION_LOCKS: WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Lock] = WeakKeyDictionary()
-_TRANSCRIPTION_LOCKS_GUARD = threading.Lock()
+_ENGINE_LOCKS: WeakKeyDictionary[Any, threading.Lock] = WeakKeyDictionary()
+_ENGINE_LOCKS_GUARD = threading.Lock()
 
 
-def _transcription_lock() -> asyncio.Lock:
-    """Return a lock bound to the currently running event loop."""
-    loop = asyncio.get_running_loop()
-    with _TRANSCRIPTION_LOCKS_GUARD:
-        lock = _TRANSCRIPTION_LOCKS.get(loop)
+def _transcription_lock(engine: Any) -> threading.Lock:
+    """Return a process-wide lock associated with the shared engine."""
+    lock = getattr(engine, "_transcription_lock", None)
+    if lock is not None:
+        return lock
+    with _ENGINE_LOCKS_GUARD:
+        lock = _ENGINE_LOCKS.get(engine)
         if lock is None:
-            lock = asyncio.Lock()
-            _TRANSCRIPTION_LOCKS[loop] = lock
+            lock = threading.Lock()
+            _ENGINE_LOCKS[engine] = lock
         return lock
 
 
@@ -38,6 +40,11 @@ async def transcribe_in_language(
     **kwargs: Any,
 ) -> Any:
     """Keep language selection stable for the complete shared-engine decode."""
-    async with _transcription_lock():
+    lock = _transcription_lock(engine)
+    while not lock.acquire(blocking=False):
+        await asyncio.sleep(0.001)
+    try:
         await engine.set_language(normalize_language(language))
         return await engine.transcribe(*args, **kwargs)
+    finally:
+        lock.release()

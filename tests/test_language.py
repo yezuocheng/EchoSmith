@@ -1,5 +1,7 @@
 import asyncio
+import threading
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 
 
 class NormalizeLanguageTests(unittest.TestCase):
@@ -79,6 +81,48 @@ class TranscriptionLanguageEventLoopTests(unittest.TestCase):
 
         self.assertEqual(asyncio.run(run_once("en")), "en")
         self.assertEqual(asyncio.run(run_once("zh")), "zh")
+
+    def test_shared_engine_is_serialized_across_event_loops(self):
+        try:
+            from backend.language import transcribe_in_language
+        except ImportError:
+            self.fail("backend.language.transcribe_in_language is missing")
+
+        class FakeEngine:
+            def __init__(self):
+                self.language = "en"
+                self.active = 0
+                self.overlap = False
+                self.state_lock = threading.Lock()
+
+            async def set_language(self, language):
+                self.language = language
+
+            async def transcribe(self):
+                with self.state_lock:
+                    self.active += 1
+                    self.overlap = self.overlap or self.active > 1
+                language = self.language
+                await asyncio.sleep(0.02)
+                with self.state_lock:
+                    self.active -= 1
+                return language
+
+        engine = FakeEngine()
+        start = threading.Barrier(2)
+
+        def run(language):
+            async def transcribe():
+                await asyncio.to_thread(start.wait, 1)
+                return await transcribe_in_language(engine, language)
+
+            return asyncio.run(transcribe())
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(run, ("en", "zh")))
+
+        self.assertCountEqual(results, ["en", "zh"])
+        self.assertFalse(engine.overlap)
 
 
 if __name__ == "__main__":
