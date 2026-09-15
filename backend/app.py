@@ -26,7 +26,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
 
 try:
     from asr_engine import ASREngine
-    from language import DEFAULT_LANGUAGE, normalize_language
+    from language import DEFAULT_LANGUAGE, normalize_language, transcribe_in_language
     from task_store import TaskRecord, TaskStatus, task_store
     from url_downloader import (
         download_audio,
@@ -36,7 +36,7 @@ try:
     )
 except ImportError:
     from .asr_engine import ASREngine
-    from .language import DEFAULT_LANGUAGE, normalize_language
+    from .language import DEFAULT_LANGUAGE, normalize_language, transcribe_in_language
     from .task_store import TaskRecord, TaskStatus, task_store
     from .url_downloader import (
         download_audio,
@@ -436,9 +436,6 @@ async def _run_task(task_id: str, source_info: dict, cleanup_paths: list[str]) -
 
         await task_store.update_task(task_id, message="转写中", progress=0.05 if source_info.get("type") != "url" else 0.30)
 
-        # Apply language setting from task
-        await engine.set_language(source_info.get("language", DEFAULT_LANGUAGE))
-
         # For URL tasks, map transcription progress from 0.3 to 1.0
         if source_info.get("type") == "url":
             def url_progress_cb(progress: float, stage: str, partial: str) -> None:
@@ -449,7 +446,9 @@ async def _run_task(task_id: str, source_info: dict, cleanup_paths: list[str]) -
         else:
             actual_progress_cb = progress_cb
 
-        result = await engine.transcribe(
+        result = await transcribe_in_language(
+            engine,
+            source_info.get("language", DEFAULT_LANGUAGE),
             audio_path,
             progress_cb=actual_progress_cb,
             pause_event=control.pause_event if control else None,

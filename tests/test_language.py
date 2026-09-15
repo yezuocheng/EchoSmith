@@ -1,3 +1,4 @@
+import asyncio
 import unittest
 
 
@@ -22,6 +23,38 @@ class NormalizeLanguageTests(unittest.TestCase):
         for language in (None, "", "de", 123):
             with self.subTest(language=language):
                 self.assertEqual(normalize_language(language), "en")
+class TranscriptionLanguageIsolationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_overlapping_tasks_keep_their_selected_language(self):
+        try:
+            from backend.language import transcribe_in_language
+        except ImportError:
+            self.fail("backend.language.transcribe_in_language is missing")
+
+        class FakeEngine:
+            def __init__(self):
+                self.language = "en"
+
+            async def set_language(self, language):
+                self.language = language
+
+            async def transcribe(self, task_name):
+                language_at_start = self.language
+                await asyncio.sleep(0.01)
+                return task_name, language_at_start, self.language
+
+        engine = FakeEngine()
+        results = await asyncio.gather(
+            transcribe_in_language(engine, "en", "english-task"),
+            transcribe_in_language(engine, "zh", "chinese-task"),
+        )
+
+        self.assertEqual(
+            results,
+            [
+                ("english-task", "en", "en"),
+                ("chinese-task", "zh", "zh"),
+            ],
+        )
 
 
 if __name__ == "__main__":
