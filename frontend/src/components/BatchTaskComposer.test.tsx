@@ -53,4 +53,17 @@ describe("BatchTaskComposer transcription language", () => {
 
     expect(screen.getByLabelText("转写语言")).toHaveValue("en");
   });
+
+  it("shows a clear start instruction after a file is dropped", () => {
+    renderComposer();
+
+    const dropZone = screen.getByRole("button", { name: /点击选择或拖拽文件到此处/ });
+    const file = new File(["audio"], "lecture.wav", { type: "audio/wav" });
+
+    fireEvent.drop(dropZone, {
+      dataTransfer: { files: [file] },
+    });
+
+    expect(screen.getByText("文件已添加，请点击“开始转写”")).toBeVisible();
+  });
 });

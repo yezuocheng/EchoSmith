@@ -371,7 +371,7 @@ export function BatchTaskComposer(): JSX.Element {
 
   return (
     <form
-      className="rounded-[20px] border border-black/[0.08] dark:border-white/[0.08] bg-white/90 dark:bg-zinc-900/90 backdrop-blur-2xl backdrop-saturate-150 shadow-[0_1px_2px_rgba(0,0,0,0.05),0_8px_16px_rgba(0,0,0,0.08)] dark:shadow-[0_1px_2px_rgba(0,0,0,0.3),0_8px_24px_rgba(0,0,0,0.4)] hover:shadow-[0_1px_2px_rgba(0,0,0,0.05),0_12px_24px_rgba(0,0,0,0.12)] dark:hover:shadow-[0_1px_2px_rgba(0,0,0,0.3),0_12px_32px_rgba(0,0,0,0.5)] transition-all duration-300 ease-out p-6 flex flex-col gap-5 h-full min-h-[420px]"
+      className="rounded-[20px] border border-black/[0.08] dark:border-white/[0.08] bg-white/90 dark:bg-zinc-900/90 backdrop-blur-2xl backdrop-saturate-150 shadow-[0_1px_2px_rgba(0,0,0,0.05),0_8px_16px_rgba(0,0,0,0.08)] dark:shadow-[0_1px_2px_rgba(0,0,0,0.3),0_8px_24px_rgba(0,0,0,0.4)] hover:shadow-[0_1px_2px_rgba(0,0,0,0.05),0_12px_24px_rgba(0,0,0,0.12)] dark:hover:shadow-[0_1px_2px_rgba(0,0,0,0.3),0_12px_32px_rgba(0,0,0,0.5)] transition-all duration-300 ease-out p-6 flex flex-col gap-5 h-full min-h-[420px] overflow-y-auto"
       onSubmit={handleSubmit}
     >
       <div>
@@ -483,10 +483,15 @@ export function BatchTaskComposer(): JSX.Element {
             ))}
           </div>
         )}
+        {batchFiles.length > 0 && !mutation.isPending && !allDone && (
+          <p className="text-xs text-indigo-600 dark:text-indigo-400" aria-live="polite">
+            文件已添加，请点击“开始转写”
+          </p>
+        )}
       </div>
 
       {/* Start button */}
-      <div className="flex items-center gap-3 mt-4">
+      <div className="sticky bottom-0 z-10 -mx-1 flex items-center gap-3 mt-4 bg-white/95 dark:bg-zinc-900/95 pt-2 pb-1">
         <Button
           type={allDone ? "button" : "submit"}
           variant="default"
