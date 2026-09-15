@@ -67,7 +67,7 @@ jobs:
               --notes "Native arm64 and x64 builds. Ad-hoc signed; not Apple-notarized."
           fi
           if [ "$PLATFORM" = windows ]; then
-            gh release upload "$tag" --repo "$GITHUB_REPOSITORY" artifacts/echosmith-windows/*/*
+            gh release upload "$tag" --repo "$GITHUB_REPOSITORY" --clobber artifacts/echosmith-windows/*/*
           else
             gh release upload "$tag" --repo "$GITHUB_REPOSITORY" --clobber artifacts/*/*.dmg
           fi
