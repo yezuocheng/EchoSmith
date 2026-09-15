@@ -57,5 +57,29 @@ class TranscriptionLanguageIsolationTests(unittest.IsolatedAsyncioTestCase):
         )
 
 
+class TranscriptionLanguageEventLoopTests(unittest.TestCase):
+    def test_helper_can_be_reused_by_separate_event_loops(self):
+        try:
+            from backend.language import transcribe_in_language
+        except ImportError:
+            self.fail("backend.language.transcribe_in_language is missing")
+
+        class FakeEngine:
+            def __init__(self):
+                self.language = "en"
+
+            async def set_language(self, language):
+                self.language = language
+
+            async def transcribe(self):
+                return self.language
+
+        async def run_once(language):
+            return await transcribe_in_language(FakeEngine(), language)
+
+        self.assertEqual(asyncio.run(run_once("en")), "en")
+        self.assertEqual(asyncio.run(run_once("zh")), "zh")
+
+
 if __name__ == "__main__":
     unittest.main()

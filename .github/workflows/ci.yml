@@ -27,10 +27,16 @@ jobs:
           ruff check backend
           black --check backend
           isort --check backend
+      - name: Run backend regression tests
+        run: python -m unittest discover -s tests -v
       - name: Install frontend deps
         run: |
           cd frontend
-          npm install
+          npm install --package-lock=false
+      - name: Run frontend regression tests
+        run: |
+          cd frontend
+          npm test -- --run src/lib/api.test.ts src/components/BatchTaskComposer.test.tsx
       - name: Lint frontend
         run: |
           cd frontend
