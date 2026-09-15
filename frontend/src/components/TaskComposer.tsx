@@ -4,15 +4,18 @@ import { useMutation } from "@tanstack/react-query";
 import { UploadIcon, PlayIcon, FileAudioIcon } from "lucide-react";
 
 import { Button } from "./ui/button";
+import { LanguageSelector } from "./LanguageSelector";
 import { createTaskFromFile } from "../lib/api";
 import { STATUS_LABELS } from "../lib/constants";
 import { useTasksStore } from "../hooks/useTasksStore";
+import { useTranscriptionLanguage } from "../hooks/useTranscriptionLanguage";
 
 export function TaskComposer(): JSX.Element {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedFileName, setSelectedFileName] = useState<string>("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [displaySource, setDisplaySource] = useState<string>("");
+  const [language, setLanguage] = useTranscriptionLanguage();
 
   const { activeTaskId, activeTask, setActiveTask, upsertTask } = useTasksStore((state) => {
     const id = state.activeTaskId;
@@ -44,7 +47,7 @@ export function TaskComposer(): JSX.Element {
       if (!selectedFile) {
         throw new Error("请先选择文件");
       }
-      return await createTaskFromFile(selectedFile);
+      return await createTaskFromFile(selectedFile, language);
     },
     onSuccess: (taskId) => {
       const sourceDescriptor = { type: "upload", name: selectedFile!.name };
@@ -96,6 +99,11 @@ export function TaskComposer(): JSX.Element {
         <h2 className="text-base font-semibold">新建任务</h2>
         <p className="text-xs text-muted-foreground mt-1">选择音视频文件进行转写</p>
       </div>
+      <LanguageSelector
+        value={language}
+        onChange={setLanguage}
+        disabled={mutation.isPending}
+      />
       <div className="space-y-4">
         <div
           className="flex flex-col items-center justify-center rounded-[16px] border-2 border-dashed border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.02] hover:bg-black/[0.04] dark:hover:bg-white/[0.04] hover:border-black/20 dark:hover:border-white/20 transition-all duration-200 px-5 py-10 text-center cursor-pointer group"

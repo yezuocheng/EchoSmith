@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { BatchTaskComposer } from "./BatchTaskComposer";
+import { TaskComposer } from "./TaskComposer";
 import { UrlTaskComposer } from "./UrlTaskComposer";
 
 function renderComposer(composer: JSX.Element = <BatchTaskComposer />) {
@@ -43,6 +44,12 @@ describe("BatchTaskComposer transcription language", () => {
 
   it("offers the same language choice for online transcription", () => {
     renderComposer(<UrlTaskComposer />);
+
+    expect(screen.getByLabelText("转写语言")).toHaveValue("en");
+  });
+
+  it("offers the language choice for single-file transcription", () => {
+    renderComposer(<TaskComposer />);
 
     expect(screen.getByLabelText("转写语言")).toHaveValue("en");
   });
