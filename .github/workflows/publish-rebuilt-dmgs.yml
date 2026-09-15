@@ -10,6 +10,13 @@ on:
         description: EchoSmith version in the DMG filename
         required: true
         default: "1.4.4"
+      platform:
+        description: Artifact platform to publish
+        type: choice
+        options:
+          - macos
+          - windows
+        default: macos
 
 permissions:
   actions: read
@@ -25,23 +32,31 @@ jobs:
           github-token: ${{ github.token }}
           repository: ${{ github.repository }}
           run-id: ${{ inputs.run_id }}
-          pattern: echosmith-macos-*
+          pattern: ${{ inputs.platform == 'windows' && 'echosmith-windows' || 'echosmith-macos-*' }}
           path: artifacts
 
       - name: Check expected DMGs
         env:
           VERSION: ${{ inputs.version }}
+          PLATFORM: ${{ inputs.platform }}
         shell: bash
         run: |
           set -euo pipefail
-          test -f "artifacts/echosmith-macos-arm64/EchoSmith_${VERSION}_arm64.dmg"
-          test -f "artifacts/echosmith-macos-x64/EchoSmith_${VERSION}_x64.dmg"
-          sha256sum artifacts/*/*.dmg
+          if [ "$PLATFORM" = windows ]; then
+            test -f "artifacts/echosmith-windows/msi/EchoSmith_${VERSION}_x64_en-US.msi"
+            test -f "artifacts/echosmith-windows/nsis/EchoSmith_${VERSION}_x64-setup.exe"
+            sha256sum artifacts/echosmith-windows/*/*
+          else
+            test -f "artifacts/echosmith-macos-arm64/EchoSmith_${VERSION}_arm64.dmg"
+            test -f "artifacts/echosmith-macos-x64/EchoSmith_${VERSION}_x64.dmg"
+            sha256sum artifacts/*/*.dmg
+          fi
 
       - name: Publish prerelease assets
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ inputs.version }}
+          PLATFORM: ${{ inputs.platform }}
         shell: bash
         run: |
           set -euo pipefail
@@ -51,4 +66,8 @@ jobs:
               --title "EchoSmith v${VERSION} rebuilt native macOS DMGs" \
               --notes "Native arm64 and x64 builds. Ad-hoc signed; not Apple-notarized."
           fi
-          gh release upload "$tag" --repo "$GITHUB_REPOSITORY" --clobber artifacts/*/*.dmg
+          if [ "$PLATFORM" = windows ]; then
+            gh release upload "$tag" --repo "$GITHUB_REPOSITORY" artifacts/echosmith-windows/*/*
+          else
+            gh release upload "$tag" --repo "$GITHUB_REPOSITORY" --clobber artifacts/*/*.dmg
+          fi
