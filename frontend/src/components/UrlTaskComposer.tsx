@@ -12,8 +12,10 @@ import {
 } from "lucide-react";
 
 import { Button } from "./ui/button";
+import { LanguageSelector } from "./LanguageSelector";
 import { createTaskFromUrl, downloadMedia } from "../lib/api";
 import { useTasksStore } from "../hooks/useTasksStore";
+import { useTranscriptionLanguage } from "../hooks/useTranscriptionLanguage";
 
 function extractUrl(text: string): string {
   const m = text.match(/https?:\/\/[^\s<>"']+/);
@@ -24,13 +26,14 @@ export function UrlTaskComposer(): JSX.Element {
   const [url, setUrl] = useState("");
   const [dlProgress, setDlProgress] = useState<{ ratio: number; message: string } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [language, setLanguage] = useTranscriptionLanguage();
 
   const upsertTask = useTasksStore((state) => state.upsertTask);
   const setActiveTask = useTasksStore((state) => state.setActiveTask);
 
   const mutation = useMutation({
     mutationFn: async (videoUrl: string) => {
-      const taskId = await createTaskFromUrl(videoUrl);
+      const taskId = await createTaskFromUrl(videoUrl, language);
 
       upsertTask({
         id: taskId,
@@ -141,6 +144,12 @@ export function UrlTaskComposer(): JSX.Element {
             </button>
           </div>
         </div>
+
+        <LanguageSelector
+          value={language}
+          onChange={setLanguage}
+          disabled={mutation.isPending}
+        />
 
         {/* Supported platforms hint */}
         <div className="rounded-xl border border-black/[0.04] dark:border-white/[0.04] bg-black/[0.02] dark:bg-white/[0.02] px-4 py-3">

@@ -1,6 +1,10 @@
 // REST/WebSocket API helpers for EchoSmith frontend.
 import axios, { AxiosHeaders } from "axios";
 import { backendStatusStore } from "./backendStatus";
+import {
+  DEFAULT_TRANSCRIPTION_LANGUAGE,
+  type TranscriptionLanguage,
+} from "./transcriptionLanguage";
 
 export interface HealthStatus {
   ffmpeg: boolean;
@@ -188,7 +192,10 @@ export async function listTasks(): Promise<TaskSnapshot[]> {
   return response.data;
 }
 
-export async function createTaskFromFile(file: File, language = "zh"): Promise<string> {
+export async function createTaskFromFile(
+  file: File,
+  language: TranscriptionLanguage = DEFAULT_TRANSCRIPTION_LANGUAGE,
+): Promise<string> {
   await ensureBackendBase();
   const form = new FormData();
   form.append("file", file);
@@ -199,13 +206,19 @@ export async function createTaskFromFile(file: File, language = "zh"): Promise<s
   return response.data.id;
 }
 
-export async function createTaskFromPath(path: string, language = "zh"): Promise<string> {
+export async function createTaskFromPath(
+  path: string,
+  language: TranscriptionLanguage = DEFAULT_TRANSCRIPTION_LANGUAGE,
+): Promise<string> {
   await ensureBackendBase();
   const response = await apiClient.post<{ id: string }>("/tasks/local", { path, language });
   return response.data.id;
 }
 
-export async function createTaskFromUrl(url: string, language = "zh"): Promise<string> {
+export async function createTaskFromUrl(
+  url: string,
+  language: TranscriptionLanguage = DEFAULT_TRANSCRIPTION_LANGUAGE,
+): Promise<string> {
   await ensureBackendBase();
   const response = await apiClient.post<{ id: string }>("/tasks/url", { url, language });
   return response.data.id;

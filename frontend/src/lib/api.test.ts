@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { apiClient, ensureBackendBase } from './api';
+import { describe, it, expect, vi } from 'vitest';
+import { apiClient, createTaskFromPath, ensureBackendBase } from './api';
 
 describe('API Client', () => {
 
@@ -28,6 +28,20 @@ describe('API Client', () => {
       expect(typeof apiClient.get).toBe('function');
       expect(typeof apiClient.post).toBe('function');
       expect(typeof apiClient.delete).toBe('function');
+    });
+  });
+
+  describe('transcription language', () => {
+    it('sends English when a task language is omitted', async () => {
+      const post = vi.spyOn(apiClient, 'post').mockResolvedValue({ data: { id: 'task-en' } });
+
+      await expect(createTaskFromPath('C:\\recordings\\lecture.m4a')).resolves.toBe('task-en');
+
+      expect(post).toHaveBeenCalledWith('/tasks/local', {
+        path: 'C:\\recordings\\lecture.m4a',
+        language: 'en',
+      });
+      post.mockRestore();
     });
   });
 });

@@ -4,8 +4,10 @@ import { useMutation } from "@tanstack/react-query";
 import { UploadIcon, PlayIcon, FileAudioIcon, XIcon, CheckIcon } from "lucide-react";
 
 import { Button } from "./ui/button";
+import { LanguageSelector } from "./LanguageSelector";
 import { createTaskFromFile, createTaskFromPath, autoExportTask } from "../lib/api";
 import { useTasksStore } from "../hooks/useTasksStore";
+import { useTranscriptionLanguage } from "../hooks/useTranscriptionLanguage";
 
 type ExportFormat = "txt" | "srt" | "json";
 
@@ -31,6 +33,7 @@ export function BatchTaskComposer(): JSX.Element {
   const abortControllerRef = useRef<AbortController | null>(null);
   const [wasInterrupted, setWasInterrupted] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [language, setLanguage] = useTranscriptionLanguage();
 
   const upsertTask = useTasksStore((state) => state.upsertTask);
   const setActiveTask = useTasksStore((state) => state.setActiveTask);
@@ -161,8 +164,8 @@ export function BatchTaskComposer(): JSX.Element {
 
           // Create task — use direct path when available (avoids file corruption)
           const taskId = batchFile.path
-            ? await createTaskFromPath(batchFile.path)
-            : await createTaskFromFile(batchFile.file);
+            ? await createTaskFromPath(batchFile.path, language)
+            : await createTaskFromFile(batchFile.file, language);
 
           // Check again after async operation
           if (useTasksStore.getState().userClearedAll) {
@@ -377,6 +380,12 @@ export function BatchTaskComposer(): JSX.Element {
           选择多个音视频文件，自动转写并保存到源文件目录
         </p>
       </div>
+
+      <LanguageSelector
+        value={language}
+        onChange={setLanguage}
+        disabled={mutation.isPending}
+      />
 
       {/* Export format selection */}
       <div>

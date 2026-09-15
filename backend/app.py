@@ -26,6 +26,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
 
 try:
     from asr_engine import ASREngine
+    from language import DEFAULT_LANGUAGE, normalize_language
     from task_store import TaskRecord, TaskStatus, task_store
     from url_downloader import (
         download_audio,
@@ -35,6 +36,7 @@ try:
     )
 except ImportError:
     from .asr_engine import ASREngine
+    from .language import DEFAULT_LANGUAGE, normalize_language
     from .task_store import TaskRecord, TaskStatus, task_store
     from .url_downloader import (
         download_audio,
@@ -69,7 +71,7 @@ UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
 engine = ASREngine()
 API_TOKEN = os.environ.get("ECHOSMITH_TOKEN")
 UPLOAD_FILE_REQUIRED = File(...)
-LANGUAGE_FORM_FIELD = Form(default="zh")
+LANGUAGE_FORM_FIELD = Form(default=DEFAULT_LANGUAGE)
 
 
 @app.get("/api/health")
@@ -156,7 +158,7 @@ async def create_task(
     _: None = Depends(verify_token),
 ) -> JSONResponse:
     task_id = uuid.uuid4().hex
-    source_info = {"language": language}
+    source_info = {"language": normalize_language(language)}
     cleanup_paths = []
 
     try:
@@ -187,7 +189,7 @@ async def create_task_from_local(
     """Accept a local file path and transcribe directly from disk."""
     body = await request.json()
     path = body.get("path", "").strip()
-    language = body.get("language", "zh")
+    language = normalize_language(body.get("language"))
 
     if not path:
         raise HTTPException(status_code=400, detail="路径不能为空")
@@ -220,7 +222,7 @@ async def create_task_from_url(
 ) -> JSONResponse:
     body = await request.json()
     raw_url = body.get("url", "").strip()
-    language = body.get("language", "zh")
+    language = normalize_language(body.get("language"))
 
     if not raw_url:
         raise HTTPException(status_code=400, detail="URL 不能为空")
@@ -435,7 +437,7 @@ async def _run_task(task_id: str, source_info: dict, cleanup_paths: list[str]) -
         await task_store.update_task(task_id, message="转写中", progress=0.05 if source_info.get("type") != "url" else 0.30)
 
         # Apply language setting from task
-        await engine.set_language(source_info.get("language", "zh"))
+        await engine.set_language(source_info.get("language", DEFAULT_LANGUAGE))
 
         # For URL tasks, map transcription progress from 0.3 to 1.0
         if source_info.get("type") == "url":

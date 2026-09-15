@@ -73,6 +73,9 @@ jobs:
       - name: Download ASR models
         run: python scripts/download_models.py
 
+      - name: Run backend regression tests
+        run: python -m unittest discover -s tests -v
+
       - name: Build native backend
         run: bash scripts/build_backend.sh
 
@@ -80,6 +83,7 @@ jobs:
         working-directory: frontend
         run: |
           npm install --package-lock=false
+          npm test -- --run src/lib/api.test.ts src/components/BatchTaskComposer.test.tsx
           npm run build
 
       - name: Copy frontend logo

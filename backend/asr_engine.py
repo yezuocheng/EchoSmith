@@ -15,6 +15,19 @@ from typing import Callable
 import numpy as np
 import sherpa_onnx
 
+try:
+    from language import (
+        DEFAULT_LANGUAGE,
+        SUPPORTED_LANGUAGES as VALID_LANGUAGES,
+        normalize_language,
+    )
+except ImportError:
+    from .language import (
+        DEFAULT_LANGUAGE,
+        SUPPORTED_LANGUAGES as VALID_LANGUAGES,
+        normalize_language,
+    )
+
 
 def _subprocess_kwargs() -> dict:
     """Return extra kwargs for subprocess.run() to work reliably on Windows.
@@ -125,7 +138,7 @@ class ASREngine:
         # for ONNX int8 inference and more threads just add overhead.
         return min(physical, 8)
 
-    SUPPORTED_LANGUAGES = {"zh", "en"}
+    SUPPORTED_LANGUAGES = VALID_LANGUAGES
 
     def __init__(
         self,
@@ -133,7 +146,7 @@ class ASREngine:
         download_callback: ModelDownloadCallback | None = None,
         num_threads: int = 0,
         use_int8: bool = True,
-        language: str = "zh",
+        language: str = DEFAULT_LANGUAGE,
     ) -> None:
         self._recognizer: sherpa_onnx.OfflineRecognizer | None = None
         self._vad_config: sherpa_onnx.VadModelConfig | None = None
@@ -145,7 +158,7 @@ class ASREngine:
         self._download_message = ""
         self._num_threads = num_threads or self._default_num_threads()
         self._use_int8 = use_int8
-        self._language = language if language in self.SUPPORTED_LANGUAGES else "zh"
+        self._language = normalize_language(language)
 
     def get_model_cache_dir(self) -> str:
         """Get the directory where models will be cached."""
@@ -170,7 +183,7 @@ class ASREngine:
 
     async def set_language(self, language: str) -> None:
         """Switch recognition language, reloading model if needed."""
-        lang = language if language in self.SUPPORTED_LANGUAGES else "zh"
+        lang = normalize_language(language)
         if lang == self._language:
             return
         async with self._model_lock:

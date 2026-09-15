@@ -6,7 +6,10 @@ on:
       run_id:
         description: Successful native macOS build run ID
         required: true
-        default: "33372959602"
+      version:
+        description: EchoSmith version in the DMG filename
+        required: true
+        default: "1.4.4"
 
 permissions:
   actions: read
@@ -26,23 +29,26 @@ jobs:
           path: artifacts
 
       - name: Check expected DMGs
+        env:
+          VERSION: ${{ inputs.version }}
         shell: bash
         run: |
           set -euo pipefail
-          test -f artifacts/echosmith-macos-arm64/EchoSmith_1.4.3_arm64.dmg
-          test -f artifacts/echosmith-macos-x64/EchoSmith_1.4.3_x64.dmg
+          test -f "artifacts/echosmith-macos-arm64/EchoSmith_${VERSION}_arm64.dmg"
+          test -f "artifacts/echosmith-macos-x64/EchoSmith_${VERSION}_x64.dmg"
           sha256sum artifacts/*/*.dmg
 
       - name: Publish prerelease assets
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
         shell: bash
         run: |
           set -euo pipefail
-          tag="rebuilt-v1.4.3"
+          tag="rebuilt-v${VERSION}"
           if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
-              --title "EchoSmith v1.4.3 rebuilt native macOS DMGs" \
+              --title "EchoSmith v${VERSION} rebuilt native macOS DMGs" \
               --notes "Native arm64 and x64 builds. Ad-hoc signed; not Apple-notarized."
           fi
           gh release upload "$tag" --repo "$GITHUB_REPOSITORY" --clobber artifacts/*/*.dmg

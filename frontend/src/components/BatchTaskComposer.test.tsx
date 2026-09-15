@@ -1,0 +1,49 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { beforeEach, describe, expect, it } from "vitest";
+
+import { BatchTaskComposer } from "./BatchTaskComposer";
+import { UrlTaskComposer } from "./UrlTaskComposer";
+
+function renderComposer(composer: JSX.Element = <BatchTaskComposer />) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      {composer}
+    </QueryClientProvider>,
+  );
+}
+
+describe("BatchTaskComposer transcription language", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("shows English as the default transcription language", () => {
+    renderComposer();
+
+    expect(screen.getByLabelText("转写语言")).toHaveValue("en");
+  });
+
+  it("restores the previously selected transcription language", () => {
+    localStorage.setItem("echosmith.transcriptionLanguage", "auto");
+
+    renderComposer();
+
+    expect(screen.getByLabelText("转写语言")).toHaveValue("auto");
+  });
+
+  it("persists a changed transcription language", () => {
+    renderComposer();
+
+    fireEvent.change(screen.getByLabelText("转写语言"), { target: { value: "zh" } });
+
+    expect(localStorage.getItem("echosmith.transcriptionLanguage")).toBe("zh");
+  });
+
+  it("offers the same language choice for online transcription", () => {
+    renderComposer(<UrlTaskComposer />);
+
+    expect(screen.getByLabelText("转写语言")).toHaveValue("en");
+  });
+});
